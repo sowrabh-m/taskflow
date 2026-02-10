@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="TaskFlow">
+  <meta name="theme-color" content="#8B5CF6">
+  <meta name="description" content="Feature-rich task manager with categories, priorities, subtasks, and smart scheduling">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+  <title>TaskFlow</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { display: none; }
+    html, body { overscroll-behavior: none; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(170deg, #0F0B1E 0%, #1A1333 40%, #0D0A18 100%);
+      color: #fff;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+    }
+    input, textarea, select, button { font-family: inherit; }
+
+    #app {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      position: relative;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: calc(env(safe-area-inset-top, 20px) + 32px) 20px 12px;
+      position: sticky; top: 0; z-index: 10;
+      background: linear-gradient(180deg, #0F0B1E 0%, #0F0B1Eee 85%, transparent 100%);
+    }
+    .header-row { display: flex; justify-content: space-between; align-items: flex-start; }
+    .title { font-family: 'Instrument Serif', serif; font-size: 34px; font-weight: 400; letter-spacing: -0.5px; line-height: 1.15; }
+    .subtitle { font-size: 13px; color: rgba(255,255,255,0.4); margin-top: 2px; }
+    .subtitle .overdue-text { color: #EF4444; }
+    .stats-btn {
+      border: none; border-radius: 12px; width: 42px; height: 42px;
+      display: flex; align-items: center; justify-content: center; cursor: pointer;
+      background: rgba(255,255,255,0.06); font-size: 18px; transition: all 0.2s;
+    }
+    .stats-btn.active { background: rgba(139,92,246,0.2); }
+
+    /* ── Stats ── */
+    .stats-panel {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+      margin-top: 14px; animation: fadeIn 0.3s ease;
+    }
+    .stat-card {
+      background: rgba(255,255,255,0.04); border-radius: 12px; padding: 10px 8px;
+      text-align: center; border: 1px solid rgba(255,255,255,0.06);
+    }
+    .stat-num { font-size: 20px; font-weight: 700; color: #8B5CF6; line-height: 1.2; }
+    .stat-num.danger { color: #EF4444; }
+    .stat-num.safe { color: #10B981; }
+    .stat-label { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .progress-bar { height: 3px; background: rgba(255,255,255,0.08); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #8B5CF6, #A78BFA); border-radius: 2px; transition: width 0.5s ease; }
+
+    /* ── Search ── */
+    .search-wrap { position: relative; margin-top: 16px; }
+    .search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 18px; color: rgba(255,255,255,0.25); }
+    .search-input {
+      width: 100%; padding: 12px 40px 12px 42px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 14px; color: #fff; font-size: 14px; outline: none;
+    }
+    .search-input::placeholder { color: rgba(255,255,255,0.25); }
+    .search-clear {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.1); border: none; color: rgba(255,255,255,0.5);
+      width: 22px; height: 22px; border-radius: 50%; cursor: pointer; font-size: 11px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Categories ── */
+    .cat-scroll { display: flex; gap: 8px; margin-top: 14px; overflow-x: auto; padding-bottom: 4px; }
+    .cat-pill {
+      display: flex; align-items: center; gap: 6px; padding: 8px 14px;
+      border-radius: 20px; font-size: 13px; font-weight: 500; white-space: nowrap;
+      cursor: pointer; border: none; transition: all 0.25s; flex-shrink: 0;
+    }
+    .cat-pill:active { transform: scale(0.92); }
+    .cat-pill.active { color: #fff !important; }
+    .cat-pill:not(.active) { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.08); }
+
+    /* ── Filters ── */
+    .filter-row { display: flex; margin-top: 10px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .filter-btn {
+      flex: 1; background: none; border: none; border-bottom: 2px solid transparent;
+      padding: 10px 4px; font-size: 13px; cursor: pointer; text-align: center;
+      color: rgba(255,255,255,0.35); transition: all 0.2s; display: flex;
+      align-items: center; justify-content: center; gap: 4px;
+    }
+    .filter-btn.active { color: #fff; border-bottom-color: #8B5CF6; font-weight: 600; }
+    .filter-badge {
+      background: #EF4444; color: #fff; font-size: 9px; font-weight: 700;
+      padding: 1px 5px; border-radius: 10px;
+    }
+
+    /* ── List ── */
+    .list-container { padding: 8px 20px 0; overflow-y: auto; }
+    .empty-state { text-align: center; padding: 60px 20px; animation: fadeIn 0.5s ease; }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-text { font-size: 16px; color: rgba(255,255,255,0.4); font-weight: 500; }
+    .empty-sub { font-size: 13px; color: rgba(255,255,255,0.25); margin-top: 6px; }
+
+    /* ── Todo Item ── */
+    .todo-item {
+      background: rgba(255,255,255,0.03); border-radius: 14px; padding: 14px;
+      margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.05);
+      border-left: 3px solid #8B5CF6; transition: all 0.3s ease;
+    }
+    .todo-item:active { transform: scale(0.98); }
+    .todo-item.completed { opacity: 0.5; }
+    .todo-item.overdue { border-left-color: #EF4444; }
+    .todo-top { display: flex; align-items: flex-start; gap: 12px; }
+
+    .checkbox {
+      background: none; border: none; padding: 0; cursor: pointer; margin-top: 2px; flex-shrink: 0;
+    }
+    .checkbox-inner {
+      width: 22px; height: 22px; border-radius: 7px; border: 2px solid rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center; color: #fff;
+      font-size: 12px; font-weight: 700; transition: all 0.2s;
+    }
+    .checkbox-inner.checked { border-color: transparent; }
+    .checkbox-inner.checked span { animation: checkmark 0.3s ease; }
+
+    .todo-content { flex: 1; min-width: 0; cursor: pointer; }
+    .todo-text { font-size: 15px; font-weight: 500; line-height: 1.35; margin-bottom: 6px; word-break: break-word; }
+    .todo-text.done { text-decoration: line-through; color: rgba(255,255,255,0.35); }
+
+    .todo-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .priority-dot { font-size: 10px; }
+    .priority-label { color: rgba(255,255,255,0.3); font-size: 11px; }
+    .due-badge { font-size: 11px; padding: 2px 8px; border-radius: 8px; font-weight: 500; background: rgba(255,255,255,0.05); }
+    .due-badge.overdue { color: #EF4444; background: rgba(239,68,68,0.12); }
+    .due-badge.today { color: #F59E0B; }
+    .due-badge.normal { color: rgba(255,255,255,0.4); }
+    .subtask-badge { font-size: 11px; color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 8px; }
+
+    .todo-actions { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+    .act-btn {
+      background: none; border: none; color: rgba(255,255,255,0.3); font-size: 16px;
+      cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: all 0.15s;
+    }
+    .act-btn.delete { color: rgba(239,68,68,0.6); }
+    .act-btn:active { transform: scale(0.85); }
+
+    /* ── Subtask Expand ── */
+    .subtask-list {
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06);
+      margin-left: 34px; display: flex; flex-direction: column; gap: 8px;
+      animation: slideDown 0.3s ease; overflow: hidden;
+    }
+    .subtask-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+    .subtask-check {
+      width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid rgba(255,255,255,0.15);
+      display: flex; align-items: center; justify-content: center; color: #fff;
+      font-size: 8px; flex-shrink: 0; transition: all 0.2s;
+    }
+    .subtask-check.checked { border-color: transparent; }
+    .subtask-text { font-size: 13px; color: rgba(255,255,255,0.7); }
+    .subtask-text.done { text-decoration: line-through; color: rgba(255,255,255,0.3); }
+
+    /* ── FAB ── */
+    .fab {
+      position: fixed; bottom: calc(env(safe-area-inset-bottom, 8px) + 20px); right: 24px;
+      width: 58px; height: 58px; border-radius: 50%;
+      background: linear-gradient(135deg, #8B5CF6, #7C3AED); border: none;
+      color: #fff; font-size: 28px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 8px 32px rgba(139,92,246,0.4), 0 0 0 4px rgba(139,92,246,0.1);
+      z-index: 20; transition: transform 0.2s;
+    }
+    .fab:active { transform: scale(0.88); }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      z-index: 100; display: flex; align-items: flex-end; justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+    .modal-overlay.hidden { display: none; }
+    .modal {
+      background: linear-gradient(180deg, #1E1838, #150F28);
+      border-radius: 24px 24px 0 0; padding: 12px 22px calc(env(safe-area-inset-bottom, 16px) + 16px);
+      width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+      animation: modalSlide 0.35s ease;
+      border: 1px solid rgba(255,255,255,0.08); border-bottom: none;
+    }
+    .modal-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; margin: 0 auto 16px; }
+    .modal-title { font-family: 'Instrument Serif', serif; font-size: 26px; font-weight: 400; margin-bottom: 18px; }
+
+    .modal-input {
+      width: 100%; padding: 14px 16px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; color: #fff; font-size: 15px; outline: none; margin-bottom: 16px;
+    }
+    .modal-input::placeholder { color: rgba(255,255,255,0.3); }
+    .modal-input:focus { border-color: rgba(139,92,246,0.4); }
+
+    .field-label {
+      font-size: 11px; color: rgba(255,255,255,0.35); text-transform: uppercase;
+      letter-spacing: 1px; font-weight: 600; margin-bottom: 8px; display: block;
+    }
+    .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .chip {
+      padding: 7px 12px; border-radius: 10px; font-size: 12px; font-weight: 500;
+      cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap;
+      border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.06);
+      color: rgba(255,255,255,0.5); transition: all 0.15s;
+    }
+    .chip:active { transform: scale(0.9); }
+    .chip.selected { border: none; color: #fff; }
+
+    .date-row { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+    .date-input {
+      flex: 1; padding: 12px 14px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; color: #fff; font-size: 14px; outline: none;
+      color-scheme: dark;
+    }
+
+    .subtask-add-row { display: flex; gap: 8px; }
+    .subtask-add-row .modal-input { flex: 1; margin-bottom: 0; }
+    .add-sub-btn {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: rgba(139,92,246,0.2); border: 1px solid rgba(139,92,246,0.3);
+      color: #A78BFA; font-size: 20px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .subtask-preview-list { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .subtask-preview {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 6px 10px; background: rgba(255,255,255,0.03); border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .subtask-preview span { color: rgba(255,255,255,0.6); font-size: 13px; }
+
+    .save-btn {
+      width: 100%; padding: 15px; border: none; border-radius: 14px;
+      background: linear-gradient(135deg, #8B5CF6, #7C3AED);
+      color: #fff; font-size: 16px; font-weight: 600; cursor: pointer;
+      margin-top: 20px; letter-spacing: 0.3px; transition: all 0.2s;
+    }
+    .save-btn:disabled { opacity: 0.4; }
+    .save-btn:active:not(:disabled) { transform: scale(0.97); }
+
+    .bottom-spacer { height: 100px; }
+
+    /* ── Swipe hint ── */
+    .swipe-hint {
+      position: fixed; bottom: calc(env(safe-area-inset-bottom, 8px) + 88px); left: 50%;
+      transform: translateX(-50%); background: rgba(139,92,246,0.9); color: #fff;
+      padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: 500;
+      z-index: 15; animation: fadeIn 0.3s ease, fadeOut 0.3s ease 3s forwards;
+      pointer-events: none;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes pop {
+      0% { transform: scale(0.8); opacity: 0; }
+      60% { transform: scale(1.04); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    @keyframes checkmark {
+      0% { transform: scale(0); }
+      50% { transform: scale(1.3); }
+      100% { transform: scale(1); }
+    }
+    @keyframes slideDown {
+      from { max-height: 0; opacity: 0; }
+      to { max-height: 300px; opacity: 1; }
+    }
+    @keyframes modalSlide {
+      from { transform: translateY(40px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* ── Haptic on iOS ── */
+    @media (hover: none) {
+      .todo-item:active, .cat-pill:active, .fab:active, .chip:active, .save-btn:active {
+        transition-duration: 0.08s;
+      }
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// TASKFLOW - Full Feature PWA Todo App
+// ═══════════════════════════════════════════
+
+const CATEGORIES = [
+  { id: 'all',      label: 'All',      icon: '◉', color: '#8B5CF6' },
+  { id: 'work',     label: 'Work',     icon: '💼', color: '#F59E0B' },
+  { id: 'personal', label: 'Personal', icon: '🏠', color: '#10B981' },
+  { id: 'health',   label: 'Health',   icon: '💪', color: '#EF4444' },
+  { id: 'ideas',    label: 'Ideas',    icon: '💡', color: '#3B82F6' },
+  { id: 'shopping', label: 'Shop',     icon: '🛒', color: '#EC4899' },
+];
+
+const PRIORITIES = [
+  { id: 'low',    label: 'Low',    color: '#6B7280', dot: '○' },
+  { id: 'medium', label: 'Med',    color: '#F59E0B', dot: '◐' },
+  { id: 'high',   label: 'High',   color: '#EF4444', dot: '●' },
+  { id: 'urgent', label: 'Urgent', color: '#DC2626', dot: '🔥' },
+];
+
+const FILTERS = ['all', 'active', 'completed', 'overdue'];
+const PRIORITY_ORDER = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+// ── Utility functions ──
+function uid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+
+function formatDate(ds) {
+  if (!ds) return '';
+  const d = new Date(ds + 'T00:00:00');
+  const t = new Date(); t.setHours(0,0,0,0);
+  const diff = Math.floor((d - t) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  if (diff === -1) return 'Yesterday';
+  if (diff < -1) return Math.abs(diff) + 'd overdue';
+  if (diff <= 7) return 'In ' + diff + 'd';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function isOverdue(ds, done) {
+  if (!ds || done) return false;
+  return new Date(ds + 'T23:59:59') < new Date();
+}
+
+function getCat(id) { return CATEGORIES.find(c => c.id === id) || CATEGORIES[0]; }
+function getPri(id) { return PRIORITIES.find(p => p.id === id) || PRIORITIES[1]; }
+
+// ── State ──
+let state = {
+  todos: [],
+  activeCategory: 'all',
+  activeFilter: 'all',
+  searchQuery: '',
+  showStats: false,
+  showModal: false,
+  editingId: null,
+  expandedId: null,
+  form: { text: '', category: 'work', priority: 'medium', dueDate: '', subtasks: [], subtaskText: '' },
+  showHint: false,
+};
+
+// ── LocalStorage persistence ──
+function saveTodos() {
+  try { localStorage.setItem('taskflow_todos', JSON.stringify(state.todos)); } catch(e) {}
+}
+function loadTodos() {
+  try {
+    const d = localStorage.getItem('taskflow_todos');
+    if (d) { state.todos = JSON.parse(d); return true; }
+  } catch(e) {}
+  return false;
+}
+
+function initSampleTodos() {
+  const td = todayStr();
+  state.todos = [
+    { id: uid(), text: 'Review sprint backlog', category: 'work', priority: 'high', dueDate: td, completed: false, createdAt: Date.now(), subtasks: [{ id: 's1', text: 'Check blockers', done: true }, { id: 's2', text: 'Update tickets', done: false }] },
+    { id: uid(), text: 'Buy groceries', category: 'shopping', priority: 'medium', dueDate: td, completed: false, createdAt: Date.now(), subtasks: [] },
+    { id: uid(), text: 'Morning run - 5km', category: 'health', priority: 'low', dueDate: '', completed: true, createdAt: Date.now() - 86400000, subtasks: [] },
+    { id: uid(), text: 'Read architecture patterns book', category: 'personal', priority: 'low', dueDate: '', completed: false, createdAt: Date.now(), subtasks: [] },
+    { id: uid(), text: 'Brainstorm new app features', category: 'ideas', priority: 'high', dueDate: td, completed: false, createdAt: Date.now(), subtasks: [{ id: 's3', text: 'List pain points', done: false }, { id: 's4', text: 'Sketch wireframes', done: false }] },
+  ];
+}
+
+// ── Filtered + sorted todos ──
+function getFilteredTodos() {
+  return state.todos
+    .filter(t => {
+      if (state.activeCategory !== 'all' && t.category !== state.activeCategory) return false;
+      if (state.activeFilter === 'active' && t.completed) return false;
+      if (state.activeFilter === 'completed' && !t.completed) return false;
+      if (state.activeFilter === 'overdue' && !isOverdue(t.dueDate, t.completed)) return false;
+      if (state.searchQuery && !t.text.toLowerCase().includes(state.searchQuery.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      if (PRIORITY_ORDER[a.priority] !== PRIORITY_ORDER[b.priority])
+        return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+      return b.createdAt - a.createdAt;
+    });
+}
+
+// ── Stats ──
+function getStats() {
+  const total = state.todos.length;
+  const completed = state.todos.filter(t => t.completed).length;
+  const overdue = state.todos.filter(t => isOverdue(t.dueDate, t.completed)).length;
+  const today = state.todos.filter(t => t.dueDate === todayStr() && !t.completed).length;
+  return { total, completed, remaining: total - completed, overdue, today, rate: total > 0 ? Math.round(completed/total*100) : 0 };
+}
+
+// ── Actions ──
+function toggleTodo(id) { const t = state.todos.find(x => x.id === id); if (t) t.completed = !t.completed; saveTodos(); render(); }
+function deleteTodo(id) { state.todos = state.todos.filter(x => x.id !== id); if (state.expandedId === id) state.expandedId = null; saveTodos(); render(); }
+function toggleSubtask(todoId, stId) {
+  const t = state.todos.find(x => x.id === todoId);
+  if (t) { const s = (t.subtasks||[]).find(x => x.id === stId); if (s) s.done = !s.done; }
+  saveTodos(); render();
+}
+function toggleExpand(id) { state.expandedId = state.expandedId === id ? null : id; render(); }
+
+function openAddModal() {
+  state.form = { text: '', category: 'work', priority: 'medium', dueDate: '', subtasks: [], subtaskText: '' };
+  state.editingId = null;
+  state.showModal = true;
+  render();
+  setTimeout(() => { const inp = document.getElementById('modal-text'); if (inp) inp.focus(); }, 100);
+}
+
+function openEditModal(id) {
+  const t = state.todos.find(x => x.id === id);
+  if (!t) return;
+  state.form = { text: t.text, category: t.category, priority: t.priority, dueDate: t.dueDate || '', subtasks: JSON.parse(JSON.stringify(t.subtasks || [])), subtaskText: '' };
+  state.editingId = id;
+  state.showModal = true;
+  render();
+  setTimeout(() => { const inp = document.getElementById('modal-text'); if (inp) inp.focus(); }, 100);
+}
+
+function closeModal() { state.showModal = false; state.editingId = null; render(); }
+
+function saveTodoForm() {
+  if (!state.form.text.trim()) return;
+  if (state.editingId) {
+    const t = state.todos.find(x => x.id === state.editingId);
+    if (t) { Object.assign(t, { text: state.form.text.trim(), category: state.form.category, priority: state.form.priority, dueDate: state.form.dueDate, subtasks: state.form.subtasks }); }
+  } else {
+    state.todos.unshift({
+      id: uid(), text: state.form.text.trim(), category: state.form.category,
+      priority: state.form.priority, dueDate: state.form.dueDate,
+      completed: false, createdAt: Date.now(), subtasks: state.form.subtasks,
+    });
+  }
+  state.showModal = false;
+  state.editingId = null;
+  saveTodos(); render();
+}
+
+function addFormSubtask() {
+  if (!state.form.subtaskText.trim()) return;
+  state.form.subtasks.push({ id: uid(), text: state.form.subtaskText.trim(), done: false });
+  state.form.subtaskText = '';
+  render();
+}
+
+function removeFormSubtask(id) {
+  state.form.subtasks = state.form.subtasks.filter(s => s.id !== id);
+  render();
+}
+
+// ── Render ──
+function h(tag, attrs, ...children) {
+  return { tag, attrs: attrs || {}, children: children.flat().filter(c => c !== null && c !== undefined && c !== false) };
+}
+
+function renderVNode(vn) {
+  if (typeof vn === 'string' || typeof vn === 'number') return document.createTextNode(vn);
+  const el = document.createElement(vn.tag);
+  for (const [k, v] of Object.entries(vn.attrs)) {
+    if (k === 'style' && typeof v === 'object') {
+      Object.assign(el.style, v);
+    } else if (k.startsWith('on') && typeof v === 'function') {
+      el.addEventListener(k.slice(2).toLowerCase(), v);
+    } else if (k === 'className') {
+      el.className = v;
+    } else if (k === 'checked') {
+      el.checked = v;
+    } else {
+      el.setAttribute(k, v);
+    }
+  }
+  for (const child of vn.children) {
+    el.appendChild(renderVNode(child));
+  }
+  return el;
+}
+
+function render() {
+  const s = getStats();
+  const filtered = getFilteredTodos();
+  const app = document.getElementById('app');
+
+  const tree = h('div', {},
+    // Header
+    renderHeader(s),
+    // List
+    renderList(filtered),
+    // FAB
+    h('button', { className: 'fab', onClick: openAddModal }, '+'),
+    // Modal
+    state.showModal ? renderModal() : null,
+  );
+
+  app.innerHTML = '';
+  app.appendChild(renderVNode(tree));
+}
+
+function renderHeader(s) {
+  return h('div', { className: 'header' },
+    h('div', { className: 'header-row' },
+      h('div', {},
+        h('h1', { className: 'title' }, 'My Tasks'),
+        h('p', { className: 'subtitle' },
+          s.today > 0 ? s.today + ' due today' : 'All clear for today',
+          s.overdue > 0 ? h('span', { className: 'overdue-text' }, ' • ' + s.overdue + ' overdue') : null,
+        ),
+      ),
+      h('button', {
+        className: 'stats-btn' + (state.showStats ? ' active' : ''),
+        onClick: () => { state.showStats = !state.showStats; render(); }
+      }, '📊'),
+    ),
+    state.showStats ? renderStats(s) : null,
+    renderSearch(),
+    renderCategories(),
+    renderFilters(s),
+  );
+}
+
+function renderStats(s) {
+  return h('div', { className: 'stats-panel' },
+    h('div', { className: 'stat-card' },
+      h('div', { className: 'stat-num' }, s.rate + '%'),
+      h('div', { className: 'stat-label' }, 'Done'),
+      h('div', { className: 'progress-bar' },
+        h('div', { className: 'progress-fill', style: { width: s.rate + '%' } }),
+      ),
+    ),
+    h('div', { className: 'stat-card' },
+      h('div', { className: 'stat-num' }, '' + s.completed),
+      h('div', { className: 'stat-label' }, 'Completed'),
+    ),
+    h('div', { className: 'stat-card' },
+      h('div', { className: 'stat-num' }, '' + s.remaining),
+      h('div', { className: 'stat-label' }, 'Remaining'),
+    ),
+    h('div', { className: 'stat-card' },
+      h('div', { className: 'stat-num ' + (s.overdue > 0 ? 'danger' : 'safe') }, '' + s.overdue),
+      h('div', { className: 'stat-label' }, 'Overdue'),
+    ),
+  );
+}
+
+function renderSearch() {
+  return h('div', { className: 'search-wrap' },
+    h('span', { className: 'search-icon' }, '⌕'),
+    h('input', {
+      type: 'text', className: 'search-input', placeholder: 'Search tasks...',
+      value: state.searchQuery,
+      onInput: (e) => { state.searchQuery = e.target.value; render(); },
+    }),
+    state.searchQuery ? h('button', { className: 'search-clear', onClick: () => { state.searchQuery = ''; render(); } }, '✕') : null,
+  );
+}
+
+function renderCategories() {
+  return h('div', { className: 'cat-scroll' },
+    ...CATEGORIES.map(cat =>
+      h('button', {
+        className: 'cat-pill' + (state.activeCategory === cat.id ? ' active' : ''),
+        style: state.activeCategory === cat.id ? { background: cat.color, color: '#fff' } : {},
+        onClick: () => { state.activeCategory = cat.id; render(); },
+      }, cat.icon + ' ' + cat.label)
+    )
+  );
+}
+
+function renderFilters(s) {
+  return h('div', { className: 'filter-row' },
+    ...FILTERS.map(f =>
+      h('button', {
+        className: 'filter-btn' + (state.activeFilter === f ? ' active' : ''),
+        onClick: () => { state.activeFilter = f; render(); },
+      },
+        f.charAt(0).toUpperCase() + f.slice(1),
+        f === 'overdue' && s.overdue > 0 ? h('span', { className: 'filter-badge' }, '' + s.overdue) : null,
+      )
+    )
+  );
+}
+
+function renderList(filtered) {
+  if (filtered.length === 0) {
+    const icon = state.searchQuery ? '🔍' : state.activeFilter === 'completed' ? '🎯' : '✨';
+    const text = state.searchQuery ? 'No matching tasks' : state.activeFilter === 'completed' ? 'No completed tasks yet' : "You're all caught up!";
+    return h('div', { className: 'list-container' },
+      h('div', { className: 'empty-state' },
+        h('div', { className: 'empty-icon' }, icon),
+        h('div', { className: 'empty-text' }, text),
+        !state.searchQuery && state.activeFilter === 'all' ? h('div', { className: 'empty-sub' }, 'Tap + to add a new task') : null,
+      ),
+    );
+  }
+
+  return h('div', { className: 'list-container' },
+    ...filtered.map((todo, i) => renderTodoItem(todo, i)),
+    h('div', { className: 'bottom-spacer' }),
+  );
+}
+
+function renderTodoItem(todo, index) {
+  const cat = getCat(todo.category);
+  const pri = getPri(todo.priority);
+  const overdue = isOverdue(todo.dueDate, todo.completed);
+  const expanded = state.expandedId === todo.id;
+  const stDone = (todo.subtasks||[]).filter(s => s.done).length;
+  const stTotal = (todo.subtasks||[]).length;
+
+  let dueCls = 'due-badge normal';
+  if (overdue) dueCls = 'due-badge overdue';
+  else if (todo.dueDate === todayStr()) dueCls = 'due-badge today';
+
+  return h('div', { style: { animation: `pop 0.35s ease ${index * 0.04}s both` } },
+    h('div', {
+      className: 'todo-item' + (todo.completed ? ' completed' : '') + (overdue ? ' overdue' : ''),
+      style: { borderLeftColor: overdue ? '#EF4444' : cat.color },
+    },
+      h('div', { className: 'todo-top' },
+        // Checkbox
+        h('button', { className: 'checkbox', onClick: (e) => { e.stopPropagation(); toggleTodo(todo.id); } },
+          h('div', {
+            className: 'checkbox-inner' + (todo.completed ? ' checked' : ''),
+            style: todo.completed ? { background: cat.color } : {},
+          }, todo.completed ? h('span', {}, '✓') : null),
+        ),
+        // Content
+        h('div', { className: 'todo-content', onClick: () => stTotal > 0 ? toggleExpand(todo.id) : null },
+          h('div', { className: 'todo-text' + (todo.completed ? ' done' : '') }, todo.text),
+          h('div', { className: 'todo-meta' },
+            h('span', { className: 'priority-dot', style: { color: pri.color } }, pri.dot),
+            h('span', { className: 'priority-label' }, pri.label),
+            todo.dueDate ? h('span', { className: dueCls }, '📅 ' + formatDate(todo.dueDate)) : null,
+            stTotal > 0 ? h('span', { className: 'subtask-badge' }, '☐ ' + stDone + '/' + stTotal) : null,
+          ),
+        ),
+        // Actions
+        h('div', { className: 'todo-actions' },
+          h('button', { className: 'act-btn', onClick: (e) => { e.stopPropagation(); openEditModal(todo.id); } }, '✎'),
+          h('button', { className: 'act-btn delete', onClick: (e) => { e.stopPropagation(); deleteTodo(todo.id); } }, '✕'),
+        ),
+      ),
+      // Subtasks expanded
+      expanded && stTotal > 0
+        ? h('div', { className: 'subtask-list' },
+            ...(todo.subtasks||[]).map(st =>
+              h('div', { className: 'subtask-row', onClick: () => toggleSubtask(todo.id, st.id) },
+                h('div', {
+                  className: 'subtask-check' + (st.done ? ' checked' : ''),
+                  style: st.done ? { background: cat.color } : {},
+                }, st.done ? h('span', {}, '✓') : null),
+                h('span', { className: 'subtask-text' + (st.done ? ' done' : '') }, st.text),
+              )
+            )
+          )
+        : null,
+    ),
+  );
+}
+
+function renderModal() {
+  return h('div', { className: 'modal-overlay', onClick: closeModal },
+    h('div', { className: 'modal', onClick: (e) => e.stopPropagation() },
+      h('div', { className: 'modal-handle' }),
+      h('h2', { className: 'modal-title' }, state.editingId ? 'Edit Task' : 'New Task'),
+
+      // Text input
+      h('input', {
+        type: 'text', id: 'modal-text', className: 'modal-input',
+        placeholder: 'What needs to be done?', value: state.form.text,
+        onInput: (e) => { state.form.text = e.target.value; },
+        onKeydown: (e) => { if (e.key === 'Enter' && state.form.text.trim()) saveTodoForm(); },
+      }),
+
+      // Category
+      h('label', { className: 'field-label' }, 'Category'),
+      h('div', { className: 'chip-row' },
+        ...CATEGORIES.filter(c => c.id !== 'all').map(cat =>
+          h('button', {
+            className: 'chip' + (state.form.category === cat.id ? ' selected' : ''),
+            style: state.form.category === cat.id ? { background: cat.color, borderColor: 'transparent' } : {},
+            onClick: () => { state.form.category = cat.id; render(); },
+          }, cat.icon + ' ' + cat.label)
+        )
+      ),
+
+      // Priority
+      h('label', { className: 'field-label' }, 'Priority'),
+      h('div', { className: 'chip-row' },
+        ...PRIORITIES.map(p =>
+          h('button', {
+            className: 'chip' + (state.form.priority === p.id ? ' selected' : ''),
+            style: state.form.priority === p.id ? { background: p.color, borderColor: 'transparent' } : {},
+            onClick: () => { state.form.priority = p.id; render(); },
+          }, p.dot + ' ' + p.label)
+        )
+      ),
+
+      // Due Date
+      h('label', { className: 'field-label' }, 'Due Date'),
+      h('div', { className: 'date-row' },
+        h('input', {
+          type: 'date', className: 'date-input', value: state.form.dueDate,
+          onInput: (e) => { state.form.dueDate = e.target.value; },
+        }),
+        state.form.dueDate ? h('button', { className: 'act-btn', style: { fontSize: '14px' }, onClick: () => { state.form.dueDate = ''; render(); } }, '✕') : null,
+      ),
+
+      // Subtasks
+      h('label', { className: 'field-label' }, 'Subtasks (' + state.form.subtasks.length + ')'),
+      h('div', { className: 'subtask-add-row' },
+        h('input', {
+          type: 'text', className: 'modal-input', placeholder: 'Add subtask...',
+          value: state.form.subtaskText,
+          onInput: (e) => { state.form.subtaskText = e.target.value; },
+          onKeydown: (e) => { if (e.key === 'Enter') addFormSubtask(); },
+        }),
+        h('button', { className: 'add-sub-btn', onClick: addFormSubtask }, '+'),
+      ),
+      state.form.subtasks.length > 0
+        ? h('div', { className: 'subtask-preview-list' },
+            ...state.form.subtasks.map(st =>
+              h('div', { className: 'subtask-preview' },
+                h('span', {}, '☐ ' + st.text),
+                h('button', { className: 'act-btn', style: { fontSize: '12px', padding: '2px 6px' }, onClick: () => removeFormSubtask(st.id) }, '✕'),
+              )
+            )
+          )
+        : null,
+
+      // Save
+      h('button', {
+        className: 'save-btn',
+        disabled: !state.form.text.trim(),
+        onClick: saveTodoForm,
+      }, state.editingId ? 'Save Changes' : 'Add Task'),
+    ),
+  );
+}
+
+// ── Init ──
+if (!loadTodos()) initSampleTodos();
+saveTodos();
+render();
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(() => {
+    console.log('ServiceWorker registered');
+  }).catch(err => console.log('SW registration failed:', err));
+}
+</script>
+</body>
+</html>
